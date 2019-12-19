@@ -4,7 +4,12 @@ project(dylan_msc)
 add_compile_options(-std=c++11)
 
 # FOLLOWING LINE ADDED FOR USE WITH TURTLEBOT
-set(PCL_DIR "/usr/lib/aarch64-linux-gnu/cmake/pcl")
+# set(PCL_DIR "/usr/lib/aarch64-linux-gnu/cmake/pcl")
+
+# FOLLOWING ADDED FOR USE WITH MSI LAPTOP
+# set(PCL_DIR "/usr/lib/x86_64-linux-gnu/cmake/pcl")
+
+set(CMAKE_PREFIX_PATH "/usr/lib")
 
 find_package(catkin REQUIRED COMPONENTS 
     roscpp 
