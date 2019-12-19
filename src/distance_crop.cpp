@@ -27,13 +27,13 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
     pcl::PassThrough<pcl::PointXYZ> pass; // create filter object
     pass.setInputCloud(cloud);            // set incoming cloud as input to filter
     pass.setFilterFieldName("z");         // filter on z axis (depth)
-    pass.setFilterLimits(0.0f, 1.0f);
+    pass.setFilterLimits(0.0f, 2.0f);
     pass.filter(*cloud_filtered); // returns cloud_filtered, the cloud with points outside of limits removed
 
     // Repeat for y axis (height)
     pass.setInputCloud(cloud_filtered);
     pass.setFilterFieldName("y");
-    pass.setFilterLimits(-2.0f, 1.0f);
+    pass.setFilterLimits(-2.0f, 0.2f);
     pass.filter(*cloud_filtered);
 
     // Publish filtered point cloud
