@@ -31,10 +31,10 @@
 
 typedef pcl::PointCloud<pcl::PointXYZ> PCLCloud;
 
-PCLCloud::Ptr cloud(new PCLCloud), cloud_f(new PCLCloud), cloud(new PCLCloud);
+PCLCloud::Ptr cloud(new PCLCloud), cloud_f(new PCLCloud);
 PCLCloud::Ptr cloud_msg(new PCLCloud);
 
-ros::Publisher pcl_pub, marker_pub, plotter_pub;
+ros::Publisher seg_points_pub, rviz_marker_pub, cluster_info_pub;
 
 float t0 = 0.0f;
 
@@ -222,8 +222,8 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
         cent_marker.color.g = 1.0f;
         cent_marker.color.b = 0.0f;
         cent_marker.color.a = 1.0f;
-        cent_marker.lifetime = ros::Duration(0.75f);
-        marker_pub.publish(cent_marker);
+        cent_marker.lifetime = ros::Duration(1.0f);
+        rviz_marker_pub.publish(cent_marker);
 
         // centroids and bounding boxes for other processes
         dylan_msc::obj plot_obj;
@@ -242,7 +242,7 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
         plot_obj.max.y = max_pt.y;
         plot_obj.max.z = max_pt.z;
 
-        plotter_pub.publish(plot_obj);
+        cluster_info_pub.publish(plot_obj);
     }
 
     // kalman filter stuff
@@ -410,7 +410,7 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
     //         kal_marker.color.b = 1.0f;
     //         kal_marker.color.a = 1.0f;
     //         kal_marker.lifetime = ros::Duration(0.75f);
-    //         marker_pub.publish(kal_marker);
+    //         rviz_marker_pub.publish(kal_marker);
     //     }
     // }
     // --------------------------------------------
@@ -422,7 +422,7 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
     sensor_msgs::PointCloud2 output;
     pcl::toROSMsg(*cluster_sum, output);
     output.header = msg->header;
-    pcl_pub.publish(output);
+    seg_points_pub.publish(output);
     
     frame_index += 1;
     // std::cout << "\n";
@@ -456,12 +456,17 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "imageProc1");
     ros::NodeHandle node;
 
-    pcl_pub = node.advertise<PCLCloud>("/points2", 10);
-    marker_pub = node.advertise<visualization_msgs::Marker>("/mark2", 10);
-    plotter_pub = node.advertise<dylan_msc::obj>("/plot2", 10);
+    // publishes cloud with segmented objects
+    seg_points_pub = node.advertise<PCLCloud>("/seg_points", 2);
+
+    // publishes segmented object centroid markers
+    rviz_marker_pub = node.advertise<visualization_msgs::Marker>("/seg_markers", 5);
+    
+    // publishes segmented object information (index, centroid, bbox info)
+    cluster_info_pub = node.advertise<dylan_msc::obj>("/obj_info", 5);
 
     // receives cropped images from turtelbot
-    ros::Subscriber sub = node.subscribe("/cropped_points", 5, frame_cb);
+    ros::Subscriber sub = node.subscribe("/cropped_points", 2, frame_cb);
 
     ros::spin();
 

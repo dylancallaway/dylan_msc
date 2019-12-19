@@ -48,7 +48,7 @@ include_directories(
 )
 
 
-add_executable(segment_cloud src/imageProc1.cpp)
+add_executable(segment_cloud src/segment_cloud.cpp)
 add_executable(distance_crop src/distance_crop.cpp)
 target_link_libraries (distance_crop ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 target_link_libraries (segment_cloud ${catkin_LIBRARIES} ${PCL_LIBRARIES})

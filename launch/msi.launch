@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="dylan_msc" type="segment_cloud" name="segment_cloud" output="screen"/>
+
+    <!-- <node pkg="dylan_msc" type="plotter1.py" name="plotter1" output="screen"/> -->
+</launch>
