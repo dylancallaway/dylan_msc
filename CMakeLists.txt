@@ -48,10 +48,10 @@ include_directories(
 )
 
 
-add_executable(imageProc1 src/imageProc1.cpp)
+add_executable(segment_cloud src/imageProc1.cpp)
 add_executable(distance_crop src/distance_crop.cpp)
 target_link_libraries (distance_crop ${catkin_LIBRARIES} ${PCL_LIBRARIES})
-target_link_libraries (imageProc1 ${catkin_LIBRARIES} ${PCL_LIBRARIES})
-add_dependencies(imageProc1 dylan_msc_generate_messages_cpp ${${PROJECT_NAME}_EXPORTED_TARGETS}  ${catkin_EXPORTED_TARGETS})
+target_link_libraries (segment_cloud ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_dependencies(segment_cloud dylan_msc_generate_messages_cpp ${${PROJECT_NAME}_EXPORTED_TARGETS}  ${catkin_EXPORTED_TARGETS})
 add_dependencies(distance_crop dylan_msc_generate_messages_cpp ${${PROJECT_NAME}_EXPORTED_TARGETS}  ${catkin_EXPORTED_TARGETS})
 

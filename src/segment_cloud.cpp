@@ -1,9 +1,5 @@
 #include <ros/ros.h>
 #include <ros/console.h>
-#include <std_msgs/String.h>
-#include <std_msgs/Int64.h>
-#include <sensor_msgs/CameraInfo.h>
-#include <sensor_msgs/Image.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <visualization_msgs/Marker.h>
 #include <dylan_msc/obj.h>
@@ -21,8 +17,6 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl_conversions/pcl_conversions.h> // Required for pcl::fromROSMsg
-// #include <pcl/visualization/cloud_viewer.h>
-// #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl/filters/passthrough.h>
 
@@ -37,7 +31,7 @@
 
 typedef pcl::PointCloud<pcl::PointXYZ> PCLCloud;
 
-PCLCloud::Ptr cloud(new PCLCloud), cloud_f(new PCLCloud), cloud_filtered(new PCLCloud);
+PCLCloud::Ptr cloud(new PCLCloud), cloud_f(new PCLCloud), cloud(new PCLCloud);
 PCLCloud::Ptr cloud_msg(new PCLCloud);
 
 ros::Publisher pcl_pub, marker_pub, plotter_pub;
@@ -52,27 +46,14 @@ Eigen::MatrixXf P_p(6, 6), P_m(6, 6);
 
 std::vector<Eigen::MatrixXf> x_ps, x_ms, x_ms_last, zs, P_ps, P_ms, zs_orig, x_ms_orig;
 
+std::vector<pcl::PointXYZ> min_pts, max_pts;
+
 // Function called for each frame received
 void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
 {
-
     pcl::fromROSMsg(*msg, *cloud); // Convert PointCloud2 ROS msg to PCL PointCloud
-    // std::cout << "PointCloud before filtering has: " << cloud->points.size() << " data points." << std::endl;
 
-    // Passthrough filter
-    // Removes points outside of a certain range
-    pcl::PassThrough<pcl::PointXYZ> pass; // create filter object
-    pass.setInputCloud(cloud);            // set incoming cloud as input to filter
-    pass.setFilterFieldName("z");         // filter on z axis (depth)
-    pass.setFilterLimits(0.0f, 1.0f);
-    pass.filter(*cloud_filtered); // returns cloud_filtered, the cloud with points outside of limits removed
-    // Repeat for y axis (height)
-    pass.setInputCloud(cloud_filtered);
-    pass.setFilterFieldName("y");
-    pass.setFilterLimits(-2.0f, 1.0f);
-    pass.filter(*cloud_filtered);
-    // std::cout << "PointCloud after distance filtering has: " << cloud_filtered->points.size() << " data points." << std::endl;
-
+    // ------------- plane filter ---------------------
     // Estimate planar model of floor and remove it
     // Create the segmentation object for the planar model and set all the parameters
     pcl::SACSegmentation<pcl::PointXYZ> seg;
@@ -85,18 +66,18 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
     seg.setMaxIterations(50);
     seg.setDistanceThreshold(0.01f); // maximum euclidean distance between points considered to be planar
 
-    int nr_points = (int)cloud_filtered->points.size(); // get size of cloud_filtered in number of points
-    // Filter out largest planar model until cloud_filtered is reduced to XX% (see code) of original cloud_filtered
+    int nr_points = (int)cloud->points.size(); // get size of cloud in number of points
+    // Filter out largest planar model until cloud is reduced to XX% (see code) of original cloud
     bool check_val = 1;
     uint8_t check_sum = 0;
     uint8_t filter_index = 0;
-    while (filter_index < 10) // TODO make this better...
+    while (filter_index < 10)
     {
         // std::cout << filter_index << "\n"
         //   << std::endl;
         filter_index += 1;
         // Segment the largest planar component from the remaining cloud
-        seg.setInputCloud(cloud_filtered);
+        seg.setInputCloud(cloud);
         seg.segment(*inliers, *coefficients);
 
         // If no planar inliers exist
@@ -107,7 +88,7 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
         }
 
         check_val = 1;
-        static float delta_check = 0.2f;
+        static float delta_check = 0.25f;
         check_val = check_val && (coefficients->values[0] > -delta_check && coefficients->values[0] < delta_check);
         check_val = check_val && (coefficients->values[1] > -1.0f - delta_check && coefficients->values[1] < -1.0f + delta_check);
         check_val = check_val && (coefficients->values[2] > -delta_check && coefficients->values[2] < delta_check);
@@ -136,7 +117,7 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
 
         // Extract the planar inliers from the input cloud
         pcl::ExtractIndices<pcl::PointXYZ> extract;
-        extract.setInputCloud(cloud_filtered);
+        extract.setInputCloud(cloud);
         extract.setIndices(inliers);
         // extract.setNegative(false);
 
@@ -148,13 +129,15 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
         // Remove the planar inliers, extract the rest
         extract.setNegative(true);
         extract.filter(*cloud_f);
-        *cloud_filtered = *cloud_f;
+        *cloud = *cloud_f; // update cloud to be the plane filtered cloud (cloud_f)
     }
-    // std::cout << "PointCloud after plane filtering has: " << cloud_filtered->points.size() << " data points." << std::endl;
+    // std::cout << "PointCloud after plane filtering has: " << cloud->points.size() << " data points." << std::endl;
+    // -------------------- end plane filter -----------------------
 
+    // ------------------- cluster segmentation -----------------------
     // Creating the KdTree object for the search method of the extraction
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
-    tree->setInputCloud(cloud_filtered);
+    tree->setInputCloud(cloud);
 
     std::vector<pcl::PointIndices> cluster_indices;
     pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
@@ -162,7 +145,7 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
     ec.setMinClusterSize(250);
     ec.setMaxClusterSize(30000);
     ec.setSearchMethod(tree);
-    ec.setInputCloud(cloud_filtered);
+    ec.setInputCloud(cloud);
     ec.extract(cluster_indices);
 
     PCLCloud::Ptr cluster_sum(new PCLCloud);
@@ -175,23 +158,24 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
     //   << std::endl;
 
     zs.clear();
+    min_pts.clear();
+    max_pts.clear();
     for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
     {
         PCLCloud::Ptr cloud_cluster(new PCLCloud);
 
         for (std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); ++pit)
         {
-            cloud_cluster->points.push_back(cloud_filtered->points[*pit]);
+            cloud_cluster->points.push_back(cloud->points[*pit]);
         }
 
         cloud_cluster->width = cloud_cluster->points.size();
         cloud_cluster->height = 1;
         cloud_cluster->is_dense = true;
 
-        pcl::getMinMax3D(*cloud_cluster, min_pt, max_pt);
         pcl::computeCentroid(*cloud_cluster, cent_pt);
 
-        // if (cent_pt.y > 0.1f)
+		// if (cent_pt.y > 0.1f)
         // {
         // continue;
         // }
@@ -201,36 +185,26 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
         z(2) = cent_pt.z;
         zs.push_back(z);
 
+        pcl::getMinMax3D(*cloud_cluster, min_pt, max_pt);
+        min_pts.push_back(min_pt);
+        max_pts.push_back(max_pt);
+
+
+
         *cluster_sum += *cloud_cluster;
 
         // std::cout << "PointCloud representing the Cluster: " << cloud_cluster->points.size() << " data points." << std::endl;
         // std::cout << "Centroid of cluster: " << cent_pt << "\n"
         //   << std::endl;
 
-        dylan_msc::obj plot_obj;
-
-        plot_obj.index = num_clusters;
-
-        plot_obj.centroid.x = cent_pt.x;
-        plot_obj.centroid.y = cent_pt.y;
-        plot_obj.centroid.z = cent_pt.z;
-
-        plot_obj.min.x = min_pt.x;
-        plot_obj.min.y = min_pt.y;
-        plot_obj.min.z = min_pt.z;
-
-        plot_obj.max.x = max_pt.x;
-        plot_obj.max.y = max_pt.y;
-        plot_obj.max.z = max_pt.z;
-
-        plotter_pub.publish(plot_obj);
-
         num_clusters += 1;
     }
+    // ------------------- cluster segmentation -----------------------
 
-    // plot raw measurements
+    // publish raw measurements
     for (int i = 0; i < num_clusters; i++)
     {
+    	// markers for rviz
         visualization_msgs::Marker cent_marker;
         cent_marker.pose.position.x = zs[i](0);
         cent_marker.pose.position.y = zs[i](1);
@@ -250,9 +224,28 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
         cent_marker.color.a = 1.0f;
         cent_marker.lifetime = ros::Duration(0.75f);
         marker_pub.publish(cent_marker);
+
+        // centroids and bounding boxes for other processes
+        dylan_msc::obj plot_obj;
+
+        plot_obj.index = i;
+
+        plot_obj.centroid.x = zs[i](0);
+        plot_obj.centroid.y = zs[i](1);
+        plot_obj.centroid.z = zs[i](2);
+
+        plot_obj.min.x = min_pt.x;
+        plot_obj.min.y = min_pt.y;
+        plot_obj.min.z = min_pt.z;
+
+        plot_obj.max.x = max_pt.x;
+        plot_obj.max.y = max_pt.y;
+        plot_obj.max.z = max_pt.z;
+
+        plotter_pub.publish(plot_obj);
     }
 
-    // filtering stuff
+    // kalman filter stuff
     // if (frame_index < 10)
     // {
     //     x_ms.clear();
@@ -424,10 +417,13 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
 
     t0 = t1;
     last_num_clusters = num_clusters;
+
+    // publish clusters for rviz
     sensor_msgs::PointCloud2 output;
     pcl::toROSMsg(*cluster_sum, output);
     output.header = msg->header;
     pcl_pub.publish(output);
+    
     frame_index += 1;
     // std::cout << "\n";
 }
@@ -435,27 +431,27 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
 int main(int argc, char **argv)
 {
     // static matrices
-    u << 0.0f,
-        0.0f,
-        0.0f,
-        0.0f,
-        0.0f,
-        0.0f;
+    // u << 0.0f,
+    //     0.0f,
+    //     0.0f,
+    //     0.0f,
+    //     0.0f,
+    //     0.0f;
 
-    Q << 0.025f, 0.05f, 0.05f, 0.05f, 0.05f, 0.05f,
-        0.05f, 0.025f, 0.05f, 0.05f, 0.05f, 0.05f,
-        0.05f, 0.05f, 0.025f, 0.05f, 0.05f, 0.05f,
-        0.05f, 0.05f, 0.05f, 0.1f, 0.05f, 0.05f,
-        0.05f, 0.05f, 0.05f, 0.05f, 0.1f, 0.05f,
-        0.05f, 0.05f, 0.05f, 0.05f, 0.05f, 0.1f;
+    // Q << 0.025f, 0.05f, 0.05f, 0.05f, 0.05f, 0.05f,
+    //     0.05f, 0.025f, 0.05f, 0.05f, 0.05f, 0.05f,
+    //     0.05f, 0.05f, 0.025f, 0.05f, 0.05f, 0.05f,
+    //     0.05f, 0.05f, 0.05f, 0.1f, 0.05f, 0.05f,
+    //     0.05f, 0.05f, 0.05f, 0.05f, 0.1f, 0.05f,
+    //     0.05f, 0.05f, 0.05f, 0.05f, 0.05f, 0.1f;
 
-    R << 0.5f, 0.0f, 0.0f,
-        0.0f, 0.5f, 0.0f,
-        0.0f, 0.0f, 0.5f;
+    // R << 0.5f, 0.0f, 0.0f,
+    //     0.0f, 0.5f, 0.0f,
+    //     0.0f, 0.0f, 0.5f;
 
-    H << 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f;
+    // H << 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+    //     0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+    //     0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f;
 
     ros::init(argc, argv, "imageProc1");
     ros::NodeHandle node;
@@ -463,9 +459,9 @@ int main(int argc, char **argv)
     pcl_pub = node.advertise<PCLCloud>("/points2", 10);
     marker_pub = node.advertise<visualization_msgs::Marker>("/mark2", 10);
     plotter_pub = node.advertise<dylan_msc::obj>("/plot2", 10);
-    // plotter_pub = node.advertise<std_msgs::Int64>("/plot2", 10);
 
-    ros::Subscriber sub = node.subscribe("/camera/depth/color/points", 5, frame_cb);
+    // receives cropped images from turtelbot
+    ros::Subscriber sub = node.subscribe("/cropped_points", 5, frame_cb);
 
     ros::spin();
 
