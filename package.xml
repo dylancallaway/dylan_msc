@@ -1,0 +1,21 @@
+<package format="2">
+  <name>dylan_msc</name>
+  <version>1.2.4</version>
+  <description>
+  Package for work done for MSC lab.
+  </description>
+  <maintainer email="dylancallaway@berkeley.edu">Dylan Callaway</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+
+  <depend>roscpp</depend>
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>message_generation</depend>
+  <depend>message_runtime</depend>
+
+
+</package>
