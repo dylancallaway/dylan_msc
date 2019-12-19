@@ -9,7 +9,12 @@ add_compile_options(-std=c++11)
 # FOLLOWING ADDED FOR USE WITH MSI LAPTOP
 # set(PCL_DIR "/usr/lib/x86_64-linux-gnu/cmake/pcl")
 
-set(CMAKE_PREFIX_PATH "/usr/lib")
+find_path(PCL_DIR
+    PCLConfig.cmake pcl-config.cmake
+    /usr/lib/aarch64-linux-gnu/cmake/pcl /usr/lib/x86_64-linux-gnu/cmake/pcl
+)
+
+set(PCL_DIR )
 
 find_package(catkin REQUIRED COMPONENTS 
     roscpp 
