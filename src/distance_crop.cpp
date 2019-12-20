@@ -33,7 +33,7 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
     // Repeat for y axis (height)
     pass.setInputCloud(cloud_filtered);
     pass.setFilterFieldName("y");
-    pass.setFilterLimits(-2.0f, 0.2f);
+    pass.setFilterLimits(-0.5f, 0.2f);
     pass.filter(*cloud_filtered);
 
     // Publish filtered point cloud

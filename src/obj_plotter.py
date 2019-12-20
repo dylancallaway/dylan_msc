@@ -6,20 +6,26 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import matplotlib.animation as animation
+from nav_msgs.msg import Odometry
 
 
 class Plotter():
     def __init__(self):
-        rospy.init_node('plotter_node', anonymous=True)
-        rospy.Subscriber("plot2", obj, self.sub_cb)
+        rospy.init_node('obj_plotter', anonymous=True)
+        rospy.Subscriber("/obj_info_tf", obj, self.sub_cb)
+        rospy.Subscriber("/om_with_tb3/odom", Odometry, self.bot_cb)
+
+        self.bot_x = 0
+        self.bot_y = 0
+        self.bot_z = 0
 
         plt.ion()
         self.fig = plt.figure()
         self.ax = Axes3D(self.fig)
         self.graph = self.ax.scatter([], [], [], c='r', marker='o')
         axes_size = 2
-        self.ax.set_xlim(-axes_size, axes_size)
-        self.ax.set_ylim(0, axes_size)
+        self.ax.set_xlim(0, axes_size)
+        self.ax.set_ylim(-axes_size, axes_size)
         self.ax.set_zlim(-0.15, axes_size)
         self.ax.set_xlabel('X')
         self.ax.set_ylabel('Y')
@@ -50,20 +56,27 @@ class Plotter():
 
         self.bb = []
 
-        self.road_0 = [-0.5, 0, -0.15]
-        self.road_1 = [0.5, 0, -0.15]
-        self.road_2 = [-1.0, 2, -0.15]
-        self.road_3 = [1.0, 2, -0.15]
+        self.road_0 = [0, 2, -0.15]
+        self.road_1 = [0, -2, -0.15]
+        self.road_2 = [2, 2, -0.15]
+        self.road_3 = [2, -2, -0.15]
         self.road_points = (
             [[self.road_1, self.road_3, self.road_2, self.road_0]])
         self.road_plot = Poly3DCollection(
-            self.road_points, facecolors='green', linewidths=1, edgecolors='r', alpha=0.25)
+            self.road_points, facecolors='green', linewidths=1, edgecolors='r', alpha=0.5)
         self.ax.add_collection3d(self.road_plot)
+
+    def bot_cb(self, msg):
+        self.bot_x = msg.pose.pose.position.x
+        self.bot_y = msg.pose.pose.position.y
+        self.bot_z = msg.pose.pose.position.z
+
 
     def sub_cb(self, msg):
         # rospy.loginfo("recv: %d", msg.index)
 
-        if (msg.min.x > -0.75 and msg.min.x < 0.75) or (msg.max.x > -0.75 and msg.max.x < 0.75):
+        # if (msg.min.y > -0.75 and msg.min.y < 0.75) or (msg.max.y > -0.75 and msg.max.y < 0.75):
+        if True:
             if msg.index == 0:
                 # Save entire arrays
                 self.final_cent_x = self.cent_x
@@ -91,22 +104,22 @@ class Plotter():
 
             # If not a new message append the info
             self.cent_x.append(msg.centroid.x)
-            self.cent_y.append(msg.centroid.z)
-            self.cent_z.append(-msg.centroid.y)
+            self.cent_y.append(msg.centroid.y)
+            self.cent_z.append(msg.centroid.z)
             self.min_x.append(msg.min.x)
-            self.min_y.append(msg.min.z)
-            self.min_z.append(-msg.min.y)
+            self.min_y.append(msg.min.y)
+            self.min_z.append(msg.min.z)
             self.max_x.append(msg.max.x)
-            self.max_y.append(msg.max.z)
-            self.max_z.append(-msg.max.y)
-            p1 = [msg.min.x, msg.min.z, -msg.min.y]
-            p2 = [msg.max.x, msg.min.z, -msg.min.y]
-            p3 = [msg.max.x, msg.max.z, -msg.min.y]
-            p4 = [msg.min.x, msg.max.z, -msg.min.y]
-            p5 = [msg.min.x, msg.min.z, -msg.max.y]
-            p6 = [msg.max.x, msg.min.z, -msg.max.y]
-            p7 = [msg.max.x, msg.max.z, -msg.max.y]
-            p8 = [msg.min.x, msg.max.z, -msg.max.y]
+            self.max_y.append(msg.max.y)
+            self.max_z.append(msg.max.z)
+            p1 = [msg.min.x, msg.min.y, msg.min.z]
+            p2 = [msg.max.x, msg.min.y, msg.min.z]
+            p3 = [msg.max.x, msg.max.y, msg.min.z]
+            p4 = [msg.min.x, msg.max.y, msg.min.z]
+            p5 = [msg.min.x, msg.min.y, msg.max.z]
+            p6 = [msg.max.x, msg.min.y, msg.max.z]
+            p7 = [msg.max.x, msg.max.y, msg.max.z]
+            p8 = [msg.min.x, msg.max.y, msg.max.z]
 
             self.verts.append([[p1, p2, p3, p4],
                                [p5, p6, p7, p8],
@@ -121,10 +134,14 @@ class Plotter():
         cent_z = self.final_cent_z
         verts = self.final_verts
 
-        for i in range(0, len(self.bb)):
-            self.bb[i].remove()
+        # for i in range(0, len(self.bb)):
+            # self.bb[i].remove()
 
         self.bb = []
+
+        cent_x.append(self.bot_x)
+        cent_y.append(self.bot_y)
+        cent_z.append(self.bot_z)
 
         self.graph._offsets3d = (cent_x, cent_y, cent_z)
 
@@ -135,12 +152,10 @@ class Plotter():
 
         return self.graph
 
-# TODO make it robust against removing objects while it tries to plot
-
 
 if __name__ == '__main__':
     plotter1 = Plotter()
     ani = animation.FuncAnimation(
-        plotter1.fig, plotter1.animation_cb, interval=100, blit=False)
+        plotter1.fig, plotter1.animation_cb, interval=200, blit=False)
     plt.show(block=True)
     # rospy.spin() not need because of plt.show()

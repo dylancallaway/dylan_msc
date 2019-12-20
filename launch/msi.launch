@@ -1,5 +1,7 @@
 <launch>
     <node pkg="dylan_msc" type="segment_cloud" name="segment_cloud" output="screen"/>
 
-    <!-- <node pkg="dylan_msc" type="plotter1.py" name="plotter1" output="screen"/> -->
+    <node pkg="dylan_msc" type="tf_seg_info.py" name="tf_seg_info" output="screen"/>
+
+    <node pkg="dylan_msc" type="obj_plotter.py" name="obj_plotter" output="screen"/>
 </launch>

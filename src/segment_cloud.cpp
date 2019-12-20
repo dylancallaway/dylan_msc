@@ -142,7 +142,7 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
     std::vector<pcl::PointIndices> cluster_indices;
     pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
     ec.setClusterTolerance(0.02f);
-    ec.setMinClusterSize(250);
+    ec.setMinClusterSize(500);
     ec.setMaxClusterSize(30000);
     ec.setSearchMethod(tree);
     ec.setInputCloud(cloud);
@@ -189,8 +189,6 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
         min_pts.push_back(min_pt);
         max_pts.push_back(max_pt);
 
-
-
         *cluster_sum += *cloud_cluster;
 
         // std::cout << "PointCloud representing the Cluster: " << cloud_cluster->points.size() << " data points." << std::endl;
@@ -234,13 +232,13 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
         plot_obj.centroid.y = zs[i](1);
         plot_obj.centroid.z = zs[i](2);
 
-        plot_obj.min.x = min_pt.x;
-        plot_obj.min.y = min_pt.y;
-        plot_obj.min.z = min_pt.z;
+        plot_obj.min.x = min_pts[i].x;
+        plot_obj.min.y = min_pts[i].y;
+        plot_obj.min.z = min_pts[i].z;
 
-        plot_obj.max.x = max_pt.x;
-        plot_obj.max.y = max_pt.y;
-        plot_obj.max.z = max_pt.z;
+        plot_obj.max.x = max_pts[i].x;
+        plot_obj.max.y = max_pts[i].y;
+        plot_obj.max.z = max_pts[i].z;
 
         cluster_info_pub.publish(plot_obj);
     }
@@ -390,28 +388,28 @@ void frame_cb(const sensor_msgs::PointCloud2::ConstPtr &msg)
     //     }
 
     //     // kalman marker plotting
-    //     for (int j = 0; j < n; j++) // for jth x_m (estimate)
-    //     {
-    //         visualization_msgs::Marker kal_marker;
-    //         kal_marker.pose.position.x = x_ms[j](0);
-    //         kal_marker.pose.position.y = x_ms[j](1);
-    //         kal_marker.pose.position.z = x_ms[j](2);
-    //         kal_marker.type = visualization_msgs::Marker::SPHERE;
-    //         kal_marker.header.stamp = ros::Time::now();
-    //         kal_marker.header.frame_id = msg->header.frame_id;
-    //         kal_marker.ns = "centroids";
-    //         kal_marker.id = j + 100;
-    //         kal_marker.action = visualization_msgs::Marker::ADD;
-    //         kal_marker.scale.x = 0.02;
-    //         kal_marker.scale.y = 0.02;
-    //         kal_marker.scale.z = 0.02;
-    //         kal_marker.color.r = 0.0f;
-    //         kal_marker.color.g = 0.0f;
-    //         kal_marker.color.b = 1.0f;
-    //         kal_marker.color.a = 1.0f;
-    //         kal_marker.lifetime = ros::Duration(0.75f);
-    //         rviz_marker_pub.publish(kal_marker);
-    //     }
+        // for (int j = 0; j < num_clusters; j++) // for jth x_m (estimate)
+        // {
+        //     visualization_msgs::Marker kal_marker;
+        //     kal_marker.pose.position.x = x_ms[j](0);
+        //     kal_marker.pose.position.y = x_ms[j](1);
+        //     kal_marker.pose.position.z = x_ms[j](2);
+        //     kal_marker.type = visualization_msgs::Marker::SPHERE;
+        //     kal_marker.header.stamp = ros::Time::now();
+        //     kal_marker.header.frame_id = msg->header.frame_id;
+        //     kal_marker.ns = "centroids";
+        //     kal_marker.id = j + 100;
+        //     kal_marker.action = visualization_msgs::Marker::ADD;
+        //     kal_marker.scale.x = 0.02;
+        //     kal_marker.scale.y = 0.02;
+        //     kal_marker.scale.z = 0.02;
+        //     kal_marker.color.r = 0.0f;
+        //     kal_marker.color.g = 0.0f;
+        //     kal_marker.color.b = 1.0f;
+        //     kal_marker.color.a = 1.0f;
+        //     kal_marker.lifetime = ros::Duration(0.75f);
+        //     rviz_marker_pub.publish(kal_marker);
+        // }
     // }
     // --------------------------------------------
 
@@ -453,6 +451,8 @@ int main(int argc, char **argv)
     //     0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
     //     0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f;
 
+	std::cout << "Loading cloud segmentation node...\n";
+
     ros::init(argc, argv, "imageProc1");
     ros::NodeHandle node;
 
@@ -463,10 +463,12 @@ int main(int argc, char **argv)
     rviz_marker_pub = node.advertise<visualization_msgs::Marker>("/seg_markers", 5);
     
     // publishes segmented object information (index, centroid, bbox info)
-    cluster_info_pub = node.advertise<dylan_msc::obj>("/obj_info", 5);
+    cluster_info_pub = node.advertise<dylan_msc::obj>("/obj_info_raw", 5);
 
     // receives cropped images from turtelbot
     ros::Subscriber sub = node.subscribe("/cropped_points", 2, frame_cb);
+
+    std::cout << "Cloud segmentation node loaded.\n";
 
     ros::spin();
 
