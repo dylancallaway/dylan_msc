@@ -1,5 +1,5 @@
 # Point Cloud Object Detection
-See object_detection_report.pdf for an in depth explanation of how this package works.
+This package takes in point cloud data from an Intel Realsense camera and outputs segmented clusters of points that are deemed objects. See object_detection_report.pdf for a more in depth explanation of how this package works.
 
 This package is split into 4 nodes: 
 
@@ -17,7 +17,7 @@ Not part of the detection algorithm but plots the detected obstacles centroids a
 
 msi.launch starts the segment_cloud, tf_seg_info, and obj_plotter nodes and should be run on the computer that acts as the Master Node (if the TurtleBot is not the Master Node).
 
-turtlebot.launch starts the realsense2_camera, and distance_crop nodes and should be run on the TurtleBot.
+turtlebot.launch starts the realsense2_camera, and distance_crop nodes and should be run on the TurtleBot. The camera settings can be edited in this launch file.
 
 This package relies on the PCL package (http://www.pointclouds.org/) (which is included in the full install of ROS Kinetic) and the Intel Realsense ROS package and drivers (https://github.com/IntelRealSense/realsense-ros).
 
